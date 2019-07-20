@@ -47,8 +47,14 @@ namespace cereal
 #endif // RAPIDJSON_ASSERT
 
 // Enable support for parsing of nan, inf, -inf
+#ifndef CEREAL_RAPIDJSON_WRITE_DEFAULT_FLAGS
 #define CEREAL_RAPIDJSON_WRITE_DEFAULT_FLAGS kWriteNanAndInfFlag
+#endif
+
+// Enable support for parsing of nan, inf, -inf
+#ifndef CEREAL_RAPIDJSON_PARSE_DEFAULT_FLAGS
 #define CEREAL_RAPIDJSON_PARSE_DEFAULT_FLAGS kParseFullPrecisionFlag | kParseNanAndInfFlag
+#endif
 
 #include "cereal/external/rapidjson/prettywriter.h"
 #include "cereal/external/rapidjson/ostreamwrapper.h"
@@ -61,6 +67,11 @@ namespace cereal
 #include <stack>
 #include <vector>
 #include <string>
+
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 7)
+CEREAL_RAPIDJSON_DIAG_PUSH
+CEREAL_RAPIDJSON_DIAG_OFF(implicit-fallthrough)
+#endif
 
 namespace cereal
 {
@@ -477,7 +488,7 @@ namespace cereal
           }
 
           Iterator(ValueIterator begin, ValueIterator end) :
-            itsValueItBegin(begin), itsValueItEnd(end), itsIndex(0), itsType(Value)
+            itsValueItBegin(begin), itsIndex(0), itsType(Value)
           {
             if( std::distance( begin, end ) == 0 )
               itsType = Null_;
@@ -532,7 +543,7 @@ namespace cereal
 
         private:
           MemberIterator itsMemberItBegin, itsMemberItEnd; //!< The member iterator (object)
-          ValueIterator itsValueItBegin, itsValueItEnd;    //!< The value iterator (array)
+          ValueIterator itsValueItBegin;                   //!< The value iterator (array)
           size_t itsIndex;                                 //!< The current index of this iterator
           enum Type {Value, Member, Null_} itsType;        //!< Whether this holds values (array) or members (objects) or nothing
       };
@@ -749,6 +760,31 @@ namespace cereal
   /*! NVPs do not start or finish nodes - they just set up the names */
   template <class T> inline
   void epilogue( JSONInputArchive &, NameValuePair<T> const & )
+  { }
+
+  // ######################################################################
+  //! Prologue for deferred data for JSON archives
+  /*! Do nothing for the defer wrapper */
+  template <class T> inline
+  void prologue( JSONOutputArchive &, DeferredData<T> const & )
+  { }
+
+  //! Prologue for deferred data for JSON archives
+  template <class T> inline
+  void prologue( JSONInputArchive &, DeferredData<T> const & )
+  { }
+
+  // ######################################################################
+  //! Epilogue for deferred for JSON archives
+  /*! NVPs do not start or finish nodes - they just set up the names */
+  template <class T> inline
+  void epilogue( JSONOutputArchive &, DeferredData<T> const & )
+  { }
+
+  //! Epilogue for deferred for JSON archives
+  /*! Do nothing for the defer wrapper */
+  template <class T> inline
+  void epilogue( JSONInputArchive &, DeferredData<T> const & )
   { }
 
   // ######################################################################
@@ -977,5 +1013,9 @@ CEREAL_REGISTER_ARCHIVE(cereal::JSONOutputArchive)
 
 // tie input and output archives together
 CEREAL_SETUP_ARCHIVE_TRAITS(cereal::JSONInputArchive, cereal::JSONOutputArchive)
+
+#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 7)
+CEREAL_RAPIDJSON_DIAG_POP
+#endif
 
 #endif // CEREAL_ARCHIVES_JSON_HPP_

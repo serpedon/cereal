@@ -847,9 +847,6 @@ namespace cereal
         static_assert( check::valid || !check::exists, "cereal detected different types in corresponding non-member "        \
             #test_name " and " #save_name " functions. \n "                                                                  \
             "the paramater to " #test_name " must be a constant reference to the type that " #save_name " returns." );       \
-        static_assert( check::const_valid || !check::exists,                                                                 \
-            "cereal detected an invalid serialization type parameter in non-member " #test_name ".  "                        \
-            #test_name " non-member functions must accept their serialization type by non-const reference" );                \
       };                                                                                                                     \
     } /* namespace detail */                                                                                                 \
                                                                                                                              \
@@ -869,17 +866,29 @@ namespace cereal
     #undef CEREAL_MAKE_HAS_NON_MEMBER_LOAD_MINIMAL_TEST
 
     // ######################################################################
+    namespace detail
+    {
+      // const stripped away before reaching here, prevents errors on conversion from
+      // construct<const T> to construct<T>
+      template<typename T, typename A>
+      struct has_member_load_and_construct_impl : std::integral_constant<bool,
+        std::is_same<decltype( access::load_and_construct<T>( std::declval<A&>(), std::declval< ::cereal::construct<T>&>() ) ), void>::value>
+      { };
+
+      template<typename T, typename A>
+      struct has_member_versioned_load_and_construct_impl : std::integral_constant<bool,
+        std::is_same<decltype( access::load_and_construct<T>( std::declval<A&>(), std::declval< ::cereal::construct<T>&>(), 0 ) ), void>::value>
+      { };
+    } // namespace detail
+
     //! Member load and construct check
     template<typename T, typename A>
-    struct has_member_load_and_construct : std::integral_constant<bool,
-      std::is_same<decltype( access::load_and_construct<T>( std::declval<A&>(), std::declval< ::cereal::construct<T>&>() ) ), void>::value>
+    struct has_member_load_and_construct : detail::has_member_load_and_construct_impl<typename std::remove_const<T>::type, A>
     { };
 
-    // ######################################################################
     //! Member load and construct check (versioned)
     template<typename T, typename A>
-    struct has_member_versioned_load_and_construct : std::integral_constant<bool,
-      std::is_same<decltype( access::load_and_construct<T>( std::declval<A&>(), std::declval< ::cereal::construct<T>&>(), 0 ) ), void>::value>
+    struct has_member_versioned_load_and_construct : detail::has_member_versioned_load_and_construct_impl<typename std::remove_const<T>::type, A>
     { };
 
     // ######################################################################
@@ -901,7 +910,8 @@ namespace cereal
       };                                                                                                                        \
     } /* end namespace detail */                                                                                                \
     template <class T, class A>                                                                                                 \
-    struct has_non_member_##test_name : std::integral_constant<bool, detail::has_non_member_##test_name##_impl<T, A>::value> {};
+    struct has_non_member_##test_name :                                                                                         \
+      std::integral_constant<bool, detail::has_non_member_##test_name##_impl<typename std::remove_const<T>::type, A>::value> {};
 
     // ######################################################################
     //! Non member load and construct check

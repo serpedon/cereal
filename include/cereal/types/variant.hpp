@@ -1,9 +1,9 @@
-/*! \file boost_variant.hpp
-    \brief Support for boost::variant
-    \ingroup OtherTypes */
+/*! \file variant.hpp
+    \brief Support for std::variant
+    \ingroup STLSupport */
 /*
-  Copyright (c) 2014, Randolph Voorhies, Shane Grant
-  All rights reserved.
+  Copyright (c) 2014, 2017, Randolph Voorhies, Shane Grant, Juan Pedro
+  Bolivar Puente. All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
@@ -27,20 +27,20 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef CEREAL_TYPES_BOOST_VARIANT_HPP_
-#define CEREAL_TYPES_BOOST_VARIANT_HPP_
+#ifndef CEREAL_TYPES_STD_VARIANT_HPP_
+#define CEREAL_TYPES_STD_VARIANT_HPP_
 
 #include "cereal/cereal.hpp"
-#include <boost/variant.hpp>
-#include <boost/mpl/size.hpp>
+#include <variant>
+#include <cstdint>
 
 namespace cereal
 {
-  namespace boost_variant_detail
+  namespace variant_detail
   {
     //! @internal
     template <class Archive>
-    struct variant_save_visitor : boost::static_visitor<>
+    struct variant_save_visitor
     {
       variant_save_visitor(Archive & ar_) : ar(ar_) {}
 
@@ -55,52 +55,55 @@ namespace cereal
 
     //! @internal
     template<int N, class Variant, class ... Args, class Archive>
-    typename std::enable_if<N == boost::mpl::size<typename Variant::types>::value, void>::type
+    typename std::enable_if<N == std::variant_size_v<Variant>, void>::type
     load_variant(Archive & /*ar*/, int /*target*/, Variant & /*variant*/)
     {
       throw ::cereal::Exception("Error traversing variant during load");
     }
-
     //! @internal
     template<int N, class Variant, class H, class ... T, class Archive>
-    typename std::enable_if<N < boost::mpl::size<typename Variant::types>::value, void>::type
+    typename std::enable_if<N < std::variant_size_v<Variant>, void>::type
     load_variant(Archive & ar, int target, Variant & variant)
     {
       if(N == target)
       {
         H value;
         ar( CEREAL_NVP_("data", value) );
-        variant = value;
+        variant = std::move(value);
       }
       else
         load_variant<N+1, Variant, T...>(ar, target, variant);
     }
 
-  } // namespace boost_variant_detail
+  } // namespace variant_detail
 
-  //! Saving for boost::variant
+  //! Saving for std::variant
   template <class Archive, typename VariantType1, typename... VariantTypes> inline
-  void CEREAL_SAVE_FUNCTION_NAME( Archive & ar, boost::variant<VariantType1, VariantTypes...> const & variant )
+  void CEREAL_SAVE_FUNCTION_NAME( Archive & ar, std::variant<VariantType1, VariantTypes...> const & variant )
   {
-    int32_t which = variant.which();
-    ar( CEREAL_NVP_("which", which) );
-    boost_variant_detail::variant_save_visitor<Archive> visitor(ar);
-    variant.apply_visitor(visitor);
+    std::int32_t index = static_cast<std::int32_t>(variant.index());
+    ar( CEREAL_NVP_("index", index) );
+    variant_detail::variant_save_visitor<Archive> visitor(ar);
+    std::visit(visitor, variant);
   }
 
-  //! Loading for boost::variant
-  template <class Archive, typename VariantType1, typename... VariantTypes> inline
-  void CEREAL_LOAD_FUNCTION_NAME( Archive & ar, boost::variant<VariantType1, VariantTypes...> & variant )
+  //! Loading for std::variant
+  template <class Archive, typename... VariantTypes> inline
+  void CEREAL_LOAD_FUNCTION_NAME( Archive & ar, std::variant<VariantTypes...> & variant )
   {
-    typedef typename boost::variant<VariantType1, VariantTypes...>::types types;
+    using variant_t = typename std::variant<VariantTypes...>;
 
-    int32_t which;
-    ar( CEREAL_NVP_("which", which) );
-    if(which >= boost::mpl::size<types>::value)
-      throw Exception("Invalid 'which' selector when deserializing boost::variant");
+    std::int32_t index;
+    ar( CEREAL_NVP_("index", index) );
+    if(index >= static_cast<std::int32_t>(std::variant_size_v<variant_t>))
+      throw Exception("Invalid 'index' selector when deserializing std::variant");
 
-    boost_variant_detail::load_variant<0, boost::variant<VariantType1, VariantTypes...>, VariantType1, VariantTypes...>(ar, which, variant);
+    variant_detail::load_variant<0, variant_t, VariantTypes...>(ar, index, variant);
   }
+
+  //! Serializing a std::monostate
+  template <class Archive>
+  void CEREAL_SERIALIZE_FUNCTION_NAME( Archive &, std::monostate const & ) {}
 } // namespace cereal
 
-#endif // CEREAL_TYPES_BOOST_VARIANT_HPP_
+#endif // CEREAL_TYPES_STD_VARIANT_HPP_
