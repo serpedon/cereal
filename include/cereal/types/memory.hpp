@@ -418,6 +418,46 @@ namespace cereal
       wrapper.ptr.reset( nullptr );
     }
   }
+
+  //! Providing load_and_construct for types which are default-constructable
+  template <class T, class Archive>
+  inline typename std::enable_if<!traits::has_load_and_construct<T, Archive>::value, T>::type
+  load_and_construct(Archive& ar, const char* name = nullptr)
+  {
+    T value;
+    ar(cereal::make_nvp(name, value));
+
+    return value;
+  }
+
+  //! Providing load_and_construct for types which are not default-constructable but have 'load_and_construct' available
+  template <class T, class Archive>
+  inline typename std::enable_if<traits::has_load_and_construct<T, Archive>::value, T>::type
+  load_and_construct(Archive& ar, const char* name = nullptr)
+  {
+    using NonConstT = typename std::remove_const<T>::type;
+
+    // Storage type - since we can't default construct this type,
+    // we'll allocate it on the stack using std::aligned_storage
+    using ST = typename std::aligned_storage<sizeof(NonConstT), CEREAL_ALIGNOF(NonConstT)>::type;
+
+    // Allocate storage
+    ST st;
+
+#ifdef CEREAL_HAS_CPP17
+    // Note: since c++17, std::launder has to be applied to the result of reinterpret_cast.
+    // Otherwise, accessing the reinterpreted pointer causes UB (undefined behavior).
+    const auto pointerToMemory = std::launder(reinterpret_cast<NonConstT*>(&st));
+#else
+    const auto pointerToMemory = reinterpret_cast<NonConstT*>(&st);
+#endif
+
+    // Construct in-place using loadWrapper
+    memory_detail::LoadAndConstructLoadWrapper<Archive, NonConstT> loadWrapper(pointerToMemory);
+    ar(cereal::make_nvp(name, loadWrapper));
+
+    return std::move(*pointerToMemory);
+  }
 } // namespace cereal
 
 // automatically include polymorphic support

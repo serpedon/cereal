@@ -31,6 +31,7 @@
 #define CEREAL_TYPES_STD_OPTIONAL_
 
 #include "cereal/cereal.hpp"
+#include "cereal/types/memory.hpp"
 #include <optional>
 
 namespace cereal {
@@ -47,8 +48,8 @@ namespace cereal {
   }
 
   //! Loading for std::optional
-  template <class Archive, typename T> inline
-  void CEREAL_LOAD_FUNCTION_NAME(Archive& ar, std::optional<T>& optional)
+  template <class Archive, typename T>
+  inline void CEREAL_LOAD_FUNCTION_NAME(Archive& ar, std::optional<T>& optional)
   {
     bool nullopt;
     ar(CEREAL_NVP_("nullopt", nullopt));
@@ -56,9 +57,7 @@ namespace cereal {
     if (nullopt) {
       optional = std::nullopt;
     } else {
-      T value;
-      ar(CEREAL_NVP_("data", value));
-      optional = std::move(value);
+      optional.emplace(cereal::load_and_construct<T>(ar, "data"));
     }
   }
 } // namespace cereal

@@ -46,8 +46,12 @@ namespace cereal
   }
 
   //! Loading for std::list
+  /*! Disabled for types T which have 'load_and_construct' available
+      since they are probably not default-constructable.
+   */
   template <class Archive, class T, class A> inline
-  void CEREAL_LOAD_FUNCTION_NAME( Archive & ar, std::list<T, A> & list )
+  typename std::enable_if<!traits::has_load_and_construct<T, Archive>::value, void>::type
+  CEREAL_LOAD_FUNCTION_NAME( Archive & ar, std::list<T, A> & list )
   {
     size_type size;
     ar( make_size_tag( size ) );
