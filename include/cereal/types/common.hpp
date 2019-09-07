@@ -106,23 +106,42 @@ namespace cereal
     t = reinterpret_cast<typename common_detail::is_enum<T>::type const &>( value );
   }
 
-  //! Serialization for raw pointers
-  /*! This exists only to throw a static_assert to let users know we don't support raw pointers. */
-  template <class Archive, class T> inline
-  void CEREAL_SERIALIZE_FUNCTION_NAME( Archive &, T * & )
+  //! Loading for raw pointers
+  /*! Cereal does NOT support serialization of raw pointers.
+      Only raw pointers which point to a memory location which is known to be owned by a std::shared_ptr can be serialized.
+      Limitation: In the current implementation, the std::shared_ptr must always be serialized (loaded/saved) before the raw pointer.
+   */
+  template <class Archive, class T>
+  inline void CEREAL_LOAD_FUNCTION_NAME(Archive& ar, T*& rawPointer)
   {
-    static_assert(cereal::traits::detail::delay_static_assert<T>::value,
-      "Cereal does not support serializing raw pointers - please use a smart pointer");
+    uint32_t id;
+    ar(CEREAL_NVP_("id", id));
+
+    if (id & detail::msb_32bit) {
+      throw cereal::Exception(
+        "Raw pointer of type T* can only be loaded if a std::shared_ptr<T> with same target was loaded before.\n"
+        "Cereal does not support serializing any other kind of raw pointers - please use a smart pointer");
+    }
+
+    rawPointer = std::static_pointer_cast<T>(ar.getSharedPointer(id)).get();
   }
 
-  //! Serialization for C style arrays
-  template <class Archive, class T> inline
-  typename std::enable_if<std::is_array<T>::value, void>::type
-  CEREAL_SERIALIZE_FUNCTION_NAME(Archive & ar, T & array)
+  //! Saving for raw pointers
+  /*! Cereal does NOT support serialization of raw pointers.
+      Only raw pointers which point to a memory location which is known to be owned by a std::shared_ptr can be serialized.
+      Limitation: In the current implementation, the std::shared_ptr must always be serialized (loaded/saved) before the raw pointer.
+   */
+  template <class Archive, class T>
+  inline void CEREAL_SAVE_FUNCTION_NAME(Archive& ar, T* const& rawPointer)
   {
-    common_detail::serializeArray( ar, array,
-        std::integral_constant<bool, traits::is_output_serializable<BinaryData<T>, Archive>::value &&
-                                     std::is_arithmetic<typename std::remove_all_extents<T>::type>::value>() );
+    uint32_t id = ar.registerSharedPointer(rawPointer);
+    ar(CEREAL_NVP_("id", id));
+
+    if (id & detail::msb_32bit) {
+      throw cereal::Exception(
+        "Raw pointer of type T* can only be saved if a std::shared_ptr<T> with same target was saved before.\n"
+        "Cereal does not support serializing any other kind of raw pointers - please use a smart pointer");
+    }
   }
 } // namespace cereal
 
