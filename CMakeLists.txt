@@ -14,7 +14,6 @@ else()
     set(CEREAL_THREAD_LIBS "")
 endif()
 
-
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /W3 /WX")
 else()
@@ -23,6 +22,12 @@ else()
     if(WITH_WERROR)
         set(CMAKE_CXX_FLAGS "-Werror ${CMAKE_CXX_FLAGS}")
     endif(WITH_WERROR)
+
+    option(CLANG_USE_LIBCPP "Use libc++ for clang compilation" OFF)
+    if(CLANG_USE_LIBCPP)
+        set(CMAKE_CXX_FLAGS "-stdlib=libc++ ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++ -lc++abi")
+    endif()
 
     if(CMAKE_VERSION VERSION_LESS 3.1)
         set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
@@ -58,6 +63,10 @@ if(JUST_INSTALL_CEREAL)
 endif()
 
 include_directories(./include)
+
+if(NOT CMAKE_VERSION VERSION_LESS 3.12)
+  cmake_policy(VERSION 3.12)
+endif()
 
 # Boost serialization for performance sandbox
 find_package(Boost COMPONENTS serialization)
