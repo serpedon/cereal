@@ -70,9 +70,13 @@ namespace cereal
   }
 
   //! Serialization for non-arithmetic vector types
+  /*! Disabled for types T which have 'load_and_construct' available
+      since they are probably not default-constructable.
+  */
   template <class Archive, class T, class A> inline
   typename std::enable_if<(!traits::is_input_serializable<BinaryData<T>, Archive>::value
-                          || !std::is_arithmetic<T>::value) && !std::is_same<T, bool>::value, void>::type
+                          || !std::is_arithmetic<T>::value) && !std::is_same<T, bool>::value
+                          && !traits::has_load_and_construct<T, Archive>::value, void>::type
   CEREAL_LOAD_FUNCTION_NAME( Archive & ar, std::vector<T, A> & vector )
   {
     size_type size;
