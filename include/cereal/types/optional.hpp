@@ -48,8 +48,8 @@ namespace cereal {
   }
 
   //! Loading for std::optional
-  template <class Archive, typename T>
-  inline void CEREAL_LOAD_FUNCTION_NAME(Archive& ar, std::optional<T>& optional)
+  template <class Archive, typename T> inline
+  void CEREAL_LOAD_FUNCTION_NAME(Archive& ar, std::optional<T>& optional)
   {
     bool nullopt;
     ar(CEREAL_NVP_("nullopt", nullopt));
