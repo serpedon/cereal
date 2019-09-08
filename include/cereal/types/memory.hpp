@@ -430,6 +430,18 @@ namespace cereal
     return value;
   }
 
+  template <class T>
+  inline constexpr T* launder(T* p) noexcept
+  {
+#ifdef CEREAL_HAS_CPP17
+    // Note: since c++17, std::launder should be applied to the result of reinterpret_cast.
+    // Otherwise, accessing the object behind the reinterpreted pointer might cause UB (undefined behavior).
+    return std::launder(p);
+#else
+    return p;
+#endif
+  }
+
   //! Providing load_and_construct for types which are not default-constructable but have 'load_and_construct' available
   template <class T, class Archive>
   inline typename std::enable_if<traits::has_load_and_construct<T, Archive>::value, T>::type
@@ -444,19 +456,11 @@ namespace cereal
     // Allocate storage
     ST st;
 
-#ifdef CEREAL_HAS_CPP17
-    // Note: since c++17, std::launder has to be applied to the result of reinterpret_cast.
-    // Otherwise, accessing the reinterpreted pointer causes UB (undefined behavior).
-    const auto pointerToMemory = std::launder(reinterpret_cast<NonConstT*>(&st));
-#else
-    const auto pointerToMemory = reinterpret_cast<NonConstT*>(&st);
-#endif
-
     // Construct in-place using loadWrapper
-    memory_detail::LoadAndConstructLoadWrapper<Archive, NonConstT> loadWrapper(pointerToMemory);
+    memory_detail::LoadAndConstructLoadWrapper<Archive, NonConstT> loadWrapper(reinterpret_cast<NonConstT*>(&st));
     ar(cereal::make_nvp(name, loadWrapper));
 
-    return std::move(*pointerToMemory);
+    return std::move(*(launder(reinterpret_cast<NonConstT*>(&st))));
   }
 } // namespace cereal
 
