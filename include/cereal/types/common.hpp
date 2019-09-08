@@ -153,7 +153,6 @@ namespace cereal
         std::integral_constant<bool, traits::is_output_serializable<BinaryData<T>, Archive>::value &&
                                      std::is_arithmetic<typename std::remove_all_extents<T>::type>::value>() );
   }
-
 } // namespace cereal
 
 #endif // CEREAL_TYPES_COMMON_HPP_
