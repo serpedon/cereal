@@ -31,6 +31,7 @@
 #define CEREAL_TYPES_STD_VARIANT_HPP_
 
 #include "cereal/cereal.hpp"
+#include "cereal/types/memory.hpp"
 #include <variant>
 #include <cstdint>
 
@@ -55,24 +56,22 @@ namespace cereal
 
     //! @internal
     template<int N, class Variant, class ... Args, class Archive>
-    typename std::enable_if<N == std::variant_size_v<Variant>, void>::type
-    load_variant(Archive & /*ar*/, int /*target*/, Variant & /*variant*/)
+    typename std::enable_if<N == std::variant_size_v<Variant>, Variant>::type
+    load_variant(Archive & /*ar*/, int /*target*/)
     {
       throw ::cereal::Exception("Error traversing variant during load");
     }
     //! @internal
     template<int N, class Variant, class H, class ... T, class Archive>
-    typename std::enable_if<N < std::variant_size_v<Variant>, void>::type
-    load_variant(Archive & ar, int target, Variant & variant)
+    typename std::enable_if<N < std::variant_size_v<Variant>, Variant>::type
+    load_variant(Archive & ar, int target)
     {
       if(N == target)
       {
-        H value;
-        ar( CEREAL_NVP_("data", value) );
-        variant = std::move(value);
+        return Variant{std::move(cereal::load_and_construct<H>(ar, "data"))};
       }
       else
-        load_variant<N+1, Variant, T...>(ar, target, variant);
+        return load_variant<N+1, Variant, T...>(ar, target);
     }
 
   } // namespace variant_detail
@@ -98,8 +97,25 @@ namespace cereal
     if(index >= static_cast<std::int32_t>(std::variant_size_v<variant_t>))
       throw Exception("Invalid 'index' selector when deserializing std::variant");
 
-    variant_detail::load_variant<0, variant_t, VariantTypes...>(ar, index, variant);
+    variant = variant_detail::load_variant<0, variant_t, VariantTypes...>(ar, index);
   }
+
+  template <typename... VariantTypes>
+  struct LoadAndConstruct<std::variant<VariantTypes...>> {
+    template <class Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<std::variant<VariantTypes...>>& construct)
+    {
+        using variant_t = typename std::variant<VariantTypes...>;
+
+        std::int32_t index;
+        ar( CEREAL_NVP_("index", index) );
+        if(index >= static_cast<std::int32_t>(std::variant_size_v<variant_t>))
+          throw Exception("Invalid 'index' selector when deserializing std::variant");
+
+        std::variant<VariantTypes...> variant = variant_detail::load_variant<0, variant_t, VariantTypes...>(ar, index);
+        construct(std::move(variant));
+    }
+  };
 
   //! Serializing a std::monostate
   template <class Archive>

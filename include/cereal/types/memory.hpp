@@ -460,7 +460,7 @@ namespace cereal
     memory_detail::LoadAndConstructLoadWrapper<Archive, NonConstT> loadWrapper(reinterpret_cast<NonConstT*>(&st));
     ar(cereal::make_nvp(name, loadWrapper));
 
-    return std::move(*(launder(reinterpret_cast<NonConstT*>(&st))));
+    return std::move(*(cereal::launder(reinterpret_cast<NonConstT*>(&st))));
   }
 } // namespace cereal
 
