@@ -40,6 +40,11 @@ namespace cereal
   { RapidJSONException( const char * what_ ) : Exception( what_ ) {} };
 }
 
+// Inform rapidjson that assert will throw
+#ifndef CEREAL_RAPIDJSON_ASSERT_THROWS
+#define CEREAL_RAPIDJSON_ASSERT_THROWS
+#endif // CEREAL_RAPIDJSON_ASSERT_THROWS
+
 // Override rapidjson assertions to throw exceptions by default
 #ifndef CEREAL_RAPIDJSON_ASSERT
 #define CEREAL_RAPIDJSON_ASSERT(x) if(!(x)){ \
@@ -67,11 +72,6 @@ namespace cereal
 #include <stack>
 #include <vector>
 #include <string>
-
-#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 7)
-CEREAL_RAPIDJSON_DIAG_PUSH
-CEREAL_RAPIDJSON_DIAG_OFF(implicit-fallthrough)
-#endif
 
 namespace cereal
 {
@@ -220,11 +220,13 @@ namespace cereal
         {
           case NodeType::StartArray:
             itsWriter.StartArray();
+            // fall through
           case NodeType::InArray:
             itsWriter.EndArray();
             break;
           case NodeType::StartObject:
             itsWriter.StartObject();
+            // fall through
           case NodeType::InObject:
             itsWriter.EndObject();
             break;
@@ -290,13 +292,13 @@ namespace cereal
 #else // _MSC_VER
       //! Serialize a long if it would not be caught otherwise
       template <class T, traits::EnableIf<std::is_same<T, long>::value,
-                                          !std::is_same<T, std::int32_t>::value,
+                                          !std::is_same<T, int>::value,
                                           !std::is_same<T, std::int64_t>::value> = traits::sfinae> inline
       void saveValue( T t ){ saveLong( t ); }
 
       //! Serialize an unsigned long if it would not be caught otherwise
       template <class T, traits::EnableIf<std::is_same<T, unsigned long>::value,
-                                          !std::is_same<T, std::uint32_t>::value,
+                                          !std::is_same<T, unsigned>::value,
                                           !std::is_same<T, std::uint64_t>::value> = traits::sfinae> inline
       void saveValue( T t ){ saveLong( t ); }
 #endif // _MSC_VER
@@ -1013,9 +1015,5 @@ CEREAL_REGISTER_ARCHIVE(cereal::JSONOutputArchive)
 
 // tie input and output archives together
 CEREAL_SETUP_ARCHIVE_TRAITS(cereal::JSONInputArchive, cereal::JSONOutputArchive)
-
-#if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 7)
-CEREAL_RAPIDJSON_DIAG_POP
-#endif
 
 #endif // CEREAL_ARCHIVES_JSON_HPP_
