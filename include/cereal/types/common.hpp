@@ -134,7 +134,8 @@ namespace cereal
   template <class Archive, class T>
   inline void CEREAL_SAVE_FUNCTION_NAME(Archive& ar, T* const& rawPointer)
   {
-    uint32_t id = ar.registerSharedPointer(rawPointer);
+    std::shared_ptr<const void> nonOwningSharedPointer(rawPointer, [](const void *){});
+    uint32_t id = ar.registerSharedPointer(nonOwningSharedPointer);
     ar(CEREAL_NVP_("id", id));
 
     if (id & detail::msb_32bit) {
